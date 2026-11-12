@@ -3,10 +3,10 @@
 ## The question
 
 `korad_ka3005.set_voltage` formats `VSET1` as `XX.XX`, so this code quantises
-every setpoint to 10 mV. The whole dither design in `potentiostat.py` exists to
-work around that. But the format string is a fact about *this code* -- the
+every setpoint to 10 mV, and a caller that needs finer steps has to work around
+it (e.g. by dithering). But the format string is a fact about *this code* -- the
 KA3005PEA's firmware may well accept a third decimal, in which case the grid is
-1 mV, the dither is unnecessary, and the loop gets ten times finer for free.
+1 mV and every caller gets ten times finer for free.
 
 Nobody has asked the instrument. This asks it.
 
@@ -148,13 +148,12 @@ def main():
     if v_kept == 0 and v_n:
         print(f"  VERDICT: voltage grid is {V_SETPOINT_LSB*1000:g} mV, as assumed "
               f"({v_n}/{v_n} informative probes quantised).")
-        print("  No change needed. The dither in potentiostat.py is necessary work.")
+        print("  No change needed. Callers needing finer steps must work around the grid.")
     elif v_kept == v_n and v_n:
         print("  VERDICT: the firmware ACCEPTS finer voltage setpoints.")
         print("  Change korad_ka3005.set_voltage to '%06.3f' and V_SETPOINT_LSB to")
-        print("  0.001, then re-run test_potentiostat.py -- the dither tests should")
-        print("  still pass (dither becomes harmless, not wrong) and the effective")
-        print("  resolution improves ~10x. Re-check the deadband warning threshold.")
+        print("  0.001, then re-run your own tests -- the effective resolution")
+        print("  improves ~10x.")
     else:
         print(f"  VERDICT: MIXED -- {v_kept}/{v_n} informative probes kept the digit.")
         print("  Do not act without reading the raw replies above. Partial acceptance")

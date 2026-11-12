@@ -38,11 +38,3 @@ procedures that energise the output belong to the project too.
 - `STATUS?` `mode` (CV/CC) is only meaningful while the output is on.
 
 Full protocol notes: `docs/korad-ka3005-serial-protocol.md`.
-
-## Provenance
-
-Extracted 2026-11-12 from the ecam project (`software/control/`, commit
-`aed45f7`), where the Korad and OWON drivers were written and bench-proven,
-so that more than one project can use them without copying. ecam's own
-commissioning self-test stays in ecam: it energises the output and assumes
-ecam's wiring.

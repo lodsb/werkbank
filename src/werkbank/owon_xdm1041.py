@@ -6,8 +6,8 @@ measurement" command varies a little between firmware revisions, so this
 driver keeps a small fallback chain and `python -m werkbank.instruments` can
 be used to confirm which one your unit answers.
 
-Role (as first used, in the ecam project): the Owon is the *trusted
-measurement* side. It reads; it never actuates.
+Role: the trusted-measurement side of a bench setup. It reads; it never
+actuates.
 """
 
 import re

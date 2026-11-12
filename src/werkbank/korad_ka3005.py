@@ -1,14 +1,14 @@
 """Thin serial driver for the Korad KA3005P / KA3005PEA bench PSU.
 
-Role in the ECAM loop: the Korad is the **actuator**. It sources current; it
-never provides the trusted measurement. Gate-vs-reference potential is measured
-by the Owon (see potentiostat.py for why), and the Korad's own VOUT/IOUT
-readback is used only for coulometry and sanity-checking.
+The driver talks to the instrument and nothing more. Safety limits depend on
+what is wired to the terminals, so they belong to the caller. Its own VOUT/IOUT
+readback is fine for sanity checks; use a separate meter where a reading has to
+be trusted.
 
 Protocol notes (Korad KAxxxxP series, per sigrok, plus bench findings):
 - 8N1. **Baud differs by model:** sigrok documents 9600 for the classic KA3005P,
   but the **KA3005PEA on this bench runs at 115200** (verified: `KORAD KA3005PEA
-  V1.5 SN:00134176`). `autodetect()` probes both, which is why it is the
+  V1.5`). `autodetect()` probes both, which is why it is the
   preferred entry point over constructing with an explicit port.
 - **No line terminator on commands or responses**, and no checksum. So we can't
   use readline(); responses are read over a short time window instead.
@@ -17,7 +17,7 @@ Protocol notes (Korad KAxxxxP series, per sigrok, plus bench findings):
 - Firmware quirk: on protocol v2.0 many units return a spurious **sixth byte**
   from `ISET1?`. Handled by parsing replies at their fixed width -- see
   `_parse_fixed`. Grabbing the leading float is not sufficient, because a
-  numeric stray byte silently corrupts the value (and hence the coulometry).
+  numeric stray byte silently corrupts the value (and anything integrated from it).
 - The firmware is timing-sensitive; commands need a short inter-command delay
   or replies get dropped or concatenated.
 
@@ -44,7 +44,7 @@ I_MAX = 5.0
 # records a setpoint the instrument never held. See `set_voltage`.
 #
 # **Verified against the instrument** 2026-08-06 with `korad_grid_probe.py`, on
-# KORAD KA3005PEA V1.5 SN:00134176. Both grids confirmed at the firmware, not
+# KORAD KA3005PEA V1.5. Both grids confirmed at the firmware, not
 # merely assumed from the format string: 8/8 informative voltage probes and 3/3
 # current probes were quantised.
 #
@@ -84,9 +84,8 @@ def _parse_fixed(resp, width=_FIXED_WIDTH):
 
     This is what defuses the v2.0 `ISET1?` sixth-byte firmware bug. Parsing the
     leading float alone is NOT enough: when the spurious byte happens to be a
-    digit, '0.500' + '1' reads back as 0.5001 instead of 0.500. Since current
-    readings are integrated into charge, that error would land straight in the
-    coulometry.
+    digit, '0.500' + '1' reads back as 0.5001 instead of 0.500 -- an error that
+    looks like a real reading, and lands in anything integrated from it.
     """
     if not resp:
         return None
@@ -194,7 +193,7 @@ class KoradKA3005:
 
     def set_current(self, amps):
         """Set the current limit. This is the hardware safety clamp -- always
-        set it *before* enabling the output into a cell.
+        set it *before* enabling the output into a load.
 
         Returns the value actually commanded, on the 1 mA grid.
         """
@@ -245,7 +244,7 @@ class KoradKA3005:
         return self
 
     def __exit__(self, *exc):
-        # Leaving an energised cell behind is the one unacceptable failure.
+        # Leaving an energised output behind is the one unacceptable failure.
         self.safe_off()
         self.close()
 

@@ -58,8 +58,8 @@ These are the reason a naive implementation misbehaves:
    v2.0 (reportedly fixed in v2.1). This is *not* safely handled by "parse the
    leading float" — when the stray byte is a digit, `0.500` + `1` parses as
    `0.5001`. The driver parses replies at their **fixed width** (5 chars)
-   instead. On this project that value is integrated into charge, so the error
-   would land directly in the coulometry.
+   instead. A digit-valued stray byte looks like a real reading, so the error
+   would land directly in anything integrated from it.
 3. **Timing sensitivity.** The firmware drops or concatenates replies if
    commands are issued back-to-back; the driver inserts a short inter-command
    delay (~60 ms default).
@@ -72,9 +72,9 @@ Verified 2026-08-03 against the actual PSU (read-only queries, output off):
 
 | Item | sigrok reference | This unit |
 |---|---|---|
-| Model / firmware | KA3005P, protocol v2.0 | `KORAD KA3005PEA V1.5 SN:00134176` |
+| Model / firmware | KA3005P, protocol v2.0 | `KORAD KA3005PEA V1.5` |
 | Baud rate | 9600 | **115200** |
-| `*IDN?` format | `KORADKA3005PV2.0` (no spaces) | `KORAD KA3005PEA V1.5 SN:00134176` (spaced, with serial) |
+| `*IDN?` format | `KORADKA3005PV2.0` (no spaces) | `KORAD KA3005PEA V1.5` (spaced, plus a serial number) |
 | `ISET1?` sixth byte | present on many v2.0 units | **not present** — clean 5-byte `'0.500'` |
 | `STATUS?` at rest | — | `0x10` set (bit outside the documented reliable set; believed to be the beeper flag, harmless) |
 
@@ -89,26 +89,18 @@ Two consequences:
 off it reads `CC` spuriously, because the CV/CC bit is simply clear. Check the
 `output` bit before believing `mode`.
 
-## Project-specific usage notes
+## Usage notes
 
-- The Korad is the **actuator only**. Its `VOUT1?`/`IOUT1?` readback is used for
-  coulometry and sanity checks, never as the trusted measurement — that is the
-  Owon's job. See `software/control/potentiostat.py`.
 - **`ISET1:` is a safety interlock**, not just a setting. Always set the current
-  limit *before* enabling the output into a cell. **Verified 2026-08-05** in the
-  two-supply topology, where it matters most: with the Korad commanded to 0.000 V
-  and a second supply pushing ~17 mA through the shared node, a 5 mA ISET pinned
-  the current at 5.00 mA and `STATUS?` reported CC throughout. Current limiting
-  acts on the series pass element, not on the voltage setpoint, so a setpoint
-  sitting at its 0 V floor does **not** mean the clamp is out of authority.
+  limit *before* enabling the output. Verified with the output commanded to
+  0.000 V and a second supply pushing ~17 mA into the output node: a 5 mA ISET
+  pinned the current at 5.00 mA and `STATUS?` reported CC throughout. Current
+  limiting acts on the series pass element, not on the voltage setpoint, so a
+  setpoint at its 0 V floor does **not** mean the clamp is out of authority.
   (Tested envelope: 5 mA against ~17 mA available. Not evidence about amp-scale
-  external drive.) See `documentation/lab-notebook/2026-08-04.md` §A3.3c.
-- Fernmessung is available on the PEA but is deliberately **not** used to sense
-  the reference electrode — see `experiments/phase-0/setup/bath-and-mounting.md`
-  §Three-electrode wiring topology for why.
-- The output is **single-polarity (0–30 V)**. Thief-mode's steal↔deplate sign
-  flip therefore needs a physical polarity reversal (manual banana swap in
-  Phase 0; relay/H-bridge at Stage 2).
+  external drive.)
+- The output is **single-polarity (0–30 V)**. Reversing it needs external
+  switching (a relay or H-bridge).
 
 ## Bench findings: KA3005PEA V1.5 (2026-11-12)
 
